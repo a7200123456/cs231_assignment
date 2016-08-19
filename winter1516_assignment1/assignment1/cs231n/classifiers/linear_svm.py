@@ -20,8 +20,7 @@ def svm_loss_naive(W, X, y, reg):
   - gradient with respect to weights W; an array of same shape as W
   """
   dW = np.zeros(W.shape) # initialize the gradient as zero
-  CCS_v = np.zeros(X.shape[0])
-  
+
   # compute the loss and the gradient
   num_classes = W.shape[1]
   num_train = X.shape[0]
@@ -29,7 +28,6 @@ def svm_loss_naive(W, X, y, reg):
   for i in xrange(num_train):
     scores = X[i].dot(W)
     correct_class_score = scores[y[i]]
-    CCS_v[i] = scores[y[i]]
     for j in xrange(num_classes):
       if j == y[i]:
         continue
@@ -53,35 +51,7 @@ def svm_loss_naive(W, X, y, reg):
   # code above to compute the gradient.                                       #
   #############################################################################
   import theano
-  import theano.tensor as T
-  
-  
-  CCS= T.vector()
-  Wm = T.matrix()
-  Xm = T.matrix()
-  C = Wm*Xm
-  #S  = T.dot(Xm ,Wm )
-  SS  = T.sum(C)
-  #L  = (T.sum(S - CCS.dimshuffle(0,'x') +1)/num_train + 0.5 * reg * T.sum(Wm * Wm)
-  grad_w = T.grad(SS,Wm)
-  svm_grad = theano.function([CCS,Wm,Xm], grad_w)
-  
-  Wm = W
-  Xm = X
-  CCS= CCS_v
-  #
-  dW = svm_grad(CCS,Wm,Xm) 
-  
-  #A = np.array([[1,2,3],[3,4,6]])
-  #print A.shape
-  # test
-  #A = T.matrix()
-  #B = T.matrix()
-  #y1= T.dot(A,B)
-  #test = theano.function([A,B], y1)
-  #out = test([[1,2,3],[3,4,6]],[[1,2],[4,5],[8,9]])
-  #print out
-  
+
   return loss, dW
 
 
