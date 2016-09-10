@@ -49,7 +49,10 @@ class LinearClassifier(object):
       # Hint: Use np.random.choice to generate indices. Sampling with         #
       # replacement is faster than sampling without replacement.              #
       #########################################################################
-      pass
+      batch_list = np.random.choice(num_train,batch_size)
+      X_batch = X[batch_list]
+      y_batch = y[batch_list]
+      #pass
       #########################################################################
       #                       END OF YOUR CODE                                #
       #########################################################################
@@ -63,13 +66,14 @@ class LinearClassifier(object):
       # TODO:                                                                 #
       # Update the weights using the gradient and the learning rate.          #
       #########################################################################
-      pass
+      self.W = self.W - learning_rate*grad
+      #pass
       #########################################################################
       #                       END OF YOUR CODE                                #
       #########################################################################
 
       if verbose and it % 100 == 0:
-        print 'iteration %d / %d: loss %f' % (it, num_iters, loss)
+        print 'iteration %d / %d: loss %15f' % (it, num_iters, loss)
 
     return loss_history
 
@@ -91,7 +95,12 @@ class LinearClassifier(object):
     # TODO:                                                                   #
     # Implement this method. Store the predicted labels in y_pred.            #
     ###########################################################################
-    pass
+    #print X.shape
+    #print self.W.shape
+    #print np.dot(X,self.W).shape
+    y_pred = np.argmax(np.dot(X,self.W), axis=1)
+    #print y_pred.shape
+    #pass
     ###########################################################################
     #                           END OF YOUR CODE                              #
     ###########################################################################
