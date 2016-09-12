@@ -38,6 +38,7 @@ class TwoLayerNet(object):
     self.params['b1'] = np.zeros(hidden_size)
     self.params['W2'] = std * np.random.randn(hidden_size, output_size)
     self.params['b2'] = np.zeros(output_size)
+    self.Dropout_ratio = 0
 
   def loss(self, X, y=None, reg=0.0):
     """
@@ -63,8 +64,8 @@ class TwoLayerNet(object):
       with respect to the loss function; has the same keys as self.params.
     """
     # Unpack variables from the params dictionary
-    W1, b1 = self.params['W1'], self.params['b1']
-    W2, b2 = self.params['W2'], self.params['b2']
+    W1, b1 = self.params['W1']/(1-self.Dropout_ratio), self.params['b1']
+    W2, b2 = self.params['W2']/(1-self.Dropout_ratio), self.params['b2']
     N, D = X.shape
 
     # Compute the forward pass
@@ -74,7 +75,29 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    pass
+    import theano
+    import theano.tensor as T
+    import numpy
+    from itertools import izip
+
+    X_m = T.matrix()
+    W1_m = theano.shared(W1)
+    b1_v = theano.shared(b1)
+    W2_m = theano.shared(W2)
+    b2_v = theano.shared(b2)
+
+    z1 = T.dot(X_m,W1_m) + T.transpose((b1_v).dimshuffle(0,'x'))
+    a1 = T.maximum(z1,0)
+    z2 = T.dot(a1,W2_m) + T.transpose((b2_v).dimshuffle(0,'x'))
+
+    score_fnt = theano.function(
+                  inputs = [X_m],
+                  outputs = z2
+                  #,on_unused_input='ignore'
+                  )
+
+    scores = score_fnt(X)
+    #pass
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -92,7 +115,41 @@ class TwoLayerNet(object):
     # classifier loss. So that your results match ours, multiply the            #
     # regularization loss by 0.5                                                #
     #############################################################################
-    pass
+    import theano
+    import theano.tensor as T
+    import numpy
+    from itertools import izip
+
+    y_m = T.matrix()
+    X_m = T.matrix()
+    W1_m = theano.shared(W1)
+    b1_v = theano.shared(b1)
+    W2_m = theano.shared(W2)
+    b2_v = theano.shared(b2)
+
+    z1 = T.dot(X_m,W1_m) + T.transpose((b1_v).dimshuffle(0,'x'))
+    a1 = T.maximum(z1,0)
+    z2 = T.dot(a1,W2_m) + T.transpose((b2_v).dimshuffle(0,'x'))
+    exp_z2 = T.exp(z2)
+    sum_z2 = T.sum(exp_z2,axis = 1)
+    loss_m = -y_m*T.log(exp_z2/(sum_z2.dimshuffle(0,'x')))
+    loss_s = T.sum(loss_m)/N + 0.5*reg*(T.sum(W1_m**2)+T.sum(W2_m**2))
+
+    dW1,db1,dW2,db2 = T.grad(loss_s,[W1_m,b1_v,W2_m,b2_v])
+
+    loss_fnt = theano.function(
+                  inputs = [X_m,y_m],
+                  outputs = [loss_s,dW1,db1,dW2,db2]
+                  #,on_unused_input='ignore'
+                  )
+
+
+    y_matrix = np.zeros((N,W2.shape[1]))
+    for n in range(N):
+      y_matrix[n,y[n]] = 1
+    
+    loss , dW1,db1,dW2,db2 = loss_fnt(X,y_matrix)
+    #pass
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -104,7 +161,11 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+    grads['W1'] = dW1
+    grads['b1'] = db1
+    grads['W2'] = dW2
+    grads['b2'] = db2
+    #pass
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -140,6 +201,35 @@ class TwoLayerNet(object):
     train_acc_history = []
     val_acc_history = []
 
+    import theano
+    import theano.tensor as T
+    from itertools import izip
+
+    srng = theano.tensor.shared_randomstreams.RandomStreams(seed=234)
+    Dropout_mask = srng.uniform((self.params['W1'].shape[1],1))
+
+    y_m = T.matrix()
+    X_m = T.matrix()
+    W1_m = theano.shared(self.params['W1'])
+    b1_v = theano.shared(self.params['b1'])
+    W2_m = theano.shared(self.params['W2'])
+    b2_v = theano.shared(self.params['b2'])
+
+    z1 = T.dot(X_m,W1_m) + T.transpose((b1_v).dimshuffle(0,'x'))
+    a1 = T.maximum(z1,0) #* T.transpose((Dropout_mask>self.Dropout_ratio).dimshuffle(0,'x'))
+    z2 = T.dot(a1,W2_m) + T.transpose((b2_v).dimshuffle(0,'x'))
+    exp_z2 = T.exp(z2)
+    sum_z2 = T.sum(exp_z2,axis = 1)
+    loss_m = -y_m*T.log(exp_z2/(sum_z2.dimshuffle(0,'x')))
+    loss_s = T.sum(loss_m)/batch_size + 0.5*reg*(T.sum(W1_m**2)+T.sum(W2_m**2))
+
+    dW1,db1,dW2,db2 = T.grad(loss_s,[W1_m,b1_v,W2_m,b2_v])
+
+    def SGD_Update(parameters,gradients):
+        mu = learning_rate
+        parameters_updates = [(p,p-mu*g) for p,g in izip(parameters,gradients)]
+        return parameters_updates
+  
     for it in xrange(num_iters):
       X_batch = None
       y_batch = None
@@ -148,14 +238,17 @@ class TwoLayerNet(object):
       # TODO: Create a random minibatch of training data and labels, storing  #
       # them in X_batch and y_batch respectively.                             #
       #########################################################################
-      pass
+      batch_list = np.random.choice(num_train,batch_size)
+      X_batch = X[batch_list]
+      y_batch = y[batch_list]
+      #pass
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
 
       # Compute loss and gradients using the current minibatch
-      loss, grads = self.loss(X_batch, y=y_batch, reg=reg)
-      loss_history.append(loss)
+      #loss, grads = self.loss(X_batch, y=y_batch, reg=reg)
+      #loss_history.append(loss)
 
       #########################################################################
       # TODO: Use the gradients in the grads dictionary to update the         #
@@ -163,10 +256,26 @@ class TwoLayerNet(object):
       # using stochastic gradient descent. You'll need to use the gradients   #
       # stored in the grads dictionary defined above.                         #
       #########################################################################
-      pass
+
+      train_fnt = theano.function(
+                  inputs = [X_m,y_m],
+                  outputs = [loss_s,W1_m,b1_v,W2_m,b2_v],
+                  updates = SGD_Update([W1_m,b1_v,W2_m,b2_v],[dW1,db1,dW2,db2])
+                  #,on_unused_input='ignore'
+                  )
+
+      y_matrix = np.zeros((batch_size,self.params['W2'].shape[1]))
+      for n in range(batch_size):
+        y_matrix[n,y_batch[n]] = 1
+
+      loss,self.params['W1'],self.params['b1'],self.params['W2'],self.params['b2'] = train_fnt(X_batch, y_matrix)
+      
+      #pass
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
+
+      loss_history.append(loss)
 
       if verbose and it % 100 == 0:
         print 'iteration %d / %d: loss %f' % (it, num_iters, loss)
@@ -208,7 +317,9 @@ class TwoLayerNet(object):
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    pass
+    scores = self.loss(X)
+    y_pred = np.argmax(scores, axis=1)
+    #pass
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
