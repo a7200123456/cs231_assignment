@@ -45,7 +45,13 @@ class TwoLayerNet(object):
     # weights and biases using the keys 'W1' and 'b1' and second layer weights #
     # and biases using the keys 'W2' and 'b2'.                                 #
     ############################################################################
-    pass
+    
+    self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dim)
+    self.params['b1'] = np.zeros(hidden_dim)
+    self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+    self.params['b2'] = np.zeros(num_classes)
+    self.Dropout_ratio = 0
+    #pass
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -75,6 +81,34 @@ class TwoLayerNet(object):
     # TODO: Implement the forward pass for the two-layer net, computing the    #
     # class scores for X and storing them in the scores variable.              #
     ############################################################################
+    # Unpack variables from the params dictionary
+    W1, b1 = self.params['W1']/(1-self.Dropout_ratio), self.params['b1']
+    W2, b2 = self.params['W2']/(1-self.Dropout_ratio), self.params['b2']
+    N, D = X.shape
+
+    import theano
+    import theano.tensor as T
+    import numpy
+    from itertools import izip
+
+    X_m = T.matrix()
+    W1_m = theano.shared(W1)
+    b1_v = theano.shared(b1)
+    W2_m = theano.shared(W2)
+    b2_v = theano.shared(b2)
+
+    z1 = T.dot(X_m,W1_m) + T.transpose((b1_v).dimshuffle(0,'x'))
+    a1 = T.maximum(z1,0)
+    z2 = T.dot(a1,W2_m) + T.transpose((b2_v).dimshuffle(0,'x'))
+
+    score_fnt = theano.function(
+                  inputs = [X_m],
+                  outputs = z2
+                  #,on_unused_input='ignore'
+                  )
+
+    scores = score_fnt(X)
+
     pass
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -94,8 +128,45 @@ class TwoLayerNet(object):
     # NOTE: To ensure that your implementation matches ours and you pass the   #
     # automated tests, make sure that your L2 regularization includes a factor #
     # of 0.5 to simplify the expression for the gradient.                      #
-    ############################################################################
-    pass
+    ############################################################################import theano
+    import theano.tensor as T
+    import numpy
+    from itertools import izip
+
+    y_m = T.matrix()
+    X_m = T.matrix()
+    W1_m = theano.shared(W1)
+    b1_v = theano.shared(b1)
+    W2_m = theano.shared(W2)
+    b2_v = theano.shared(b2)
+
+    z1 = T.dot(X_m,W1_m) + T.transpose((b1_v).dimshuffle(0,'x'))
+    a1 = T.maximum(z1,0)
+    z2 = T.dot(a1,W2_m) + T.transpose((b2_v).dimshuffle(0,'x'))
+    exp_z2 = T.exp(z2)
+    sum_z2 = T.sum(exp_z2,axis = 1)
+    loss_m = -y_m*T.log(exp_z2/(sum_z2.dimshuffle(0,'x')))
+    loss_s = T.sum(loss_m)/N + 0.5*self.reg*(T.sum(W1_m**2)+T.sum(W2_m**2))
+
+    dW1,db1,dW2,db2 = T.grad(loss_s,[W1_m,b1_v,W2_m,b2_v])
+
+    loss_fnt = theano.function(
+                  inputs = [X_m,y_m],
+                  outputs = [loss_s,dW1,db1,dW2,db2]
+                  #,on_unused_input='ignore'
+                  )
+
+
+    y_matrix = np.zeros((N,W2.shape[1]))
+    for n in range(N):
+      y_matrix[n,y[n]] = 1
+    
+    loss , dW1,db1,dW2,db2 = loss_fnt(X,y_matrix)
+
+    grads['W1'] = dW1
+    grads['b1'] = db1
+    grads['W2'] = dW2
+    grads['b2'] = db2
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
