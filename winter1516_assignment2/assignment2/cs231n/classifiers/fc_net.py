@@ -302,16 +302,20 @@ class FullyConnectedNet(object):
     # self.bn_params[1] to the forward pass for the second batch normalization #
     # layer, etc.                                                              #
     ############################################################################
+    out = {}
+    cache = {}
     for i in range(self.num_layers):
       if i == 0:
-        self.params['z'+str(i+1)] = np.dot(X,self.params['W'+str(i+1)])+ (self.params['b'+str(i+1)]).T
-        self.params['a'+str(i+1)] = np.maximum(self.params['z'+str(i+1)],0)
+        out['L'+str(i+1)], cache['L'+str(i+1)] = affine_relu_forward(X, self.params['W'+str(i+1)], self.params['b'+str(i+1)])
+        #self.params['z'+str(i+1)] = np.dot(X,self.params['W'+str(i+1)])+ (self.params['b'+str(i+1)]).T
+        #self.params['a'+str(i+1)] = np.maximum(self.params['z'+str(i+1)],0)
       else:
-        self.params['z'+str(i+1)] = np.dot(self.params['a'+str(i)],self.params['W'+str(i+1)])+ (self.params['b'+str(i+1)]).T
-        self.params['a'+str(i+1)] = np.maximum(self.params['z'+str(i+1)],0)
+        out['L'+str(i+1)], cache['L'+str(i+1)] = affine_relu_forward(out['L'+str(i)], self.params['W'+str(i+1)], self.params['b'+str(i+1)])
+        #self.params['z'+str(i+1)] = np.dot(self.params['a'+str(i)],self.params['W'+str(i+1)])+ (self.params['b'+str(i+1)]).T
+        #self.params['a'+str(i+1)] = np.maximum(self.params['z'+str(i+1)],0)
 
-    scores = self.params['z'+str(self.num_layers)]
-
+    scores = out['L'+str(self.num_layers)]
+    #print scores
     pass
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -335,43 +339,36 @@ class FullyConnectedNet(object):
     # automated tests, make sure that your L2 regularization includes a factor #
     # of 0.5 to simplify the expression for the gradient.                      #
     ############################################################################
-    import theano.tensor as T
-    import numpy
-    from itertools import izip
-
-    y_m = T.matrix()
-    X_m = T.matrix()
-    W2_m = theano.shared(W2)
-    b2_v = theano.shared(b2)
-
-    z2 = T.dot(a1,W2_m) + T.transpose((b2_v).dimshuffle(0,'x'))
-    exp_z2 = T.exp(z2)
-    sum_z2 = T.sum(exp_z2,axis = 1)
-    loss_m = -y_m*T.log(exp_z2/(sum_z2.dimshuffle(0,'x')))
-    loss_s = T.sum(loss_m)/N + 0.5*self.reg*T.sum(W2_m**2)
-
-    dW2,db2 = T.grad(loss_s,[W1_m,b1_v,W2_m,b2_v])
-
-    loss_fnt = theano.function(
-                  inputs = [X_m,y_m],
-                  outputs = [loss_s,dW1,db1,dW2,db2]
-                  #,on_unused_input='ignore'
-                  )
-
-
-    y_matrix = np.zeros((N,W2.shape[1]))
+    N = scores.shape[0]
+    num_classes = scores.shape[1]
+    y_matrix = np.zeros(scores.shape)
     for n in range(N):
       y_matrix[n,y[n]] = 1
-    
-    loss , dW1,db1,dW2,db2 = loss_fnt(X_2D,y_matrix)
 
-    grads['W1'] = dW1
-    grads['b1'] = db1
-    grads['W2'] = dW2
-    grads['b2'] = db2
+    exp_scores = np.exp(scores- np.max(scores, axis=1, keepdims=True))
+    sum_exp_scores = np.sum(exp_scores,axis = 1)
+    loss_m = -y_matrix*np.log(exp_scores/(sum_exp_scores[:,None]))
+
+    W_total = 0;
+    for i in range(self.num_layers):
+        W_total += np.sum(self.params['W'+str(i+1)]**2)
+    
+    loss_s = np.sum(loss_m)/N + 0.5*self.reg*W_total
+
+    loss = loss_s
+
+    grads_X = (exp_scores/(sum_exp_scores[:,None])) - y_matrix
+    
+    for i in range(self.num_layers):
+      cur_layer = self.num_layers -i
+      grads_X, grads['W'+str(cur_layer)], grads['b'+str(cur_layer)] = \
+                  affine_relu_backward(grads_X, cache['L'+str(cur_layer)])  
+      grads['W'+str(cur_layer)] /= N
+      grads['b'+str(cur_layer)] /= N
+      grads['W'+str(cur_layer)] += self.reg*self.params['W'+str(cur_layer)]
     pass
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
-
+    #print grads['W1'].shape
     return loss, grads
