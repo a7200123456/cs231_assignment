@@ -187,7 +187,7 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     running_mean = momentum * running_mean + (1 - momentum) * x_mean
     running_var = momentum * running_var + (1 - momentum) * (x_std**2)
     
-    cache = x, x_norm ,gamma
+    cache = x, x_norm ,gamma ,eps
     pass
     #############################################################################
     #                             END OF YOUR CODE                              #
@@ -237,7 +237,7 @@ def batchnorm_backward(dout, cache):
   # TODO: Implement the backward pass for batch normalization. Store the      #
   # results in the dx, dgamma, and dbeta variables.                           #
   #############################################################################
-  x, x_norm, gamma = cache
+  x, x_norm, gamma,eps = cache
   N = x.shape[0]
   x_mean = np.mean(x, axis = 0)
   x_std  = np.std(x, axis = 0)
@@ -247,8 +247,8 @@ def batchnorm_backward(dout, cache):
   #dx = gamma * ((1-1/n)*x_std**2 - 2*(x-x_mean)**2/n)/(x_std**3) * dout
 
   dx_normalized = gamma* dout
-  dsample_var = np.sum(-1.0/2*dx_normalized*x_norm/(x_std**2), axis =0)
-  dsample_mean = np.sum(-1/np.sqrt(x_std**2)* dx_normalized, axis = 0) # drop the second term which simplfies to zero
+  dsample_var = np.sum(-1.0/2*dx_normalized*x_norm/(x_std**2+eps), axis =0)
+  dsample_mean = np.sum(-1/np.sqrt(x_std**2+eps)* dx_normalized, axis = 0) # drop the second term which simplfies to zero
   dx = 1/np.sqrt(x_std**2)*dx_normalized + dsample_var*2.0/N*(x-x_mean) + 1.0/N*dsample_mean
   
   pass
@@ -326,14 +326,24 @@ def dropout_forward(x, dropout_param):
   if 'seed' in dropout_param:
     np.random.seed(dropout_param['seed'])
 
-  mask = None
+  mask = {}
   out = None
-
   if mode == 'train':
     ###########################################################################
     # TODO: Implement the training phase forward pass for inverted dropout.   #
     # Store the dropout mask in the mask variable.                            #
     ###########################################################################
+    
+    x_2D =  np.copy(np.reshape(x,(x.shape[0],np.prod(x.shape[1:]))))
+    out = x_2D
+    #print x_2D.shape
+    for i in range(x_2D.shape[1]):
+        mask[str(i)] = np.random.choice(x.shape[0], int(x.shape[0]*p), replace=False)
+        out[mask[str(i)],i] = 0
+
+    #print x.mean()
+    out =  np.reshape(out,x.shape)
+
     pass
     ###########################################################################
     #                            END OF YOUR CODE                             #
@@ -342,6 +352,7 @@ def dropout_forward(x, dropout_param):
     ###########################################################################
     # TODO: Implement the test phase forward pass for inverted dropout.       #
     ###########################################################################
+    out = x*(1-p)
     pass
     ###########################################################################
     #                            END OF YOUR CODE                             #
@@ -369,6 +380,12 @@ def dropout_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the training phase backward pass for inverted dropout.  #
     ###########################################################################
+    dout_2D =  np.copy(np.reshape(dout,(dout.shape[0],np.prod(dout.shape[1:]))))
+    for i in range(dout_2D.shape[1]):
+        dout_2D[mask[str(i)],i] = 0
+
+    dx =  np.reshape(dout_2D,dout.shape)
+     
     pass
     ###########################################################################
     #                            END OF YOUR CODE                             #

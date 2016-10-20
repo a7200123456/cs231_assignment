@@ -340,6 +340,7 @@ class FullyConnectedNet(object):
     ############################################################################
     out = {}
     cache = {}
+    dropout_cache = {}
     for i in range(self.num_layers):
       if i == 0:
         if self.use_batchnorm:
@@ -362,6 +363,9 @@ class FullyConnectedNet(object):
           out['L'+str(i+1)], cache['L'+str(i+1)] = affine_relu_forward(out['L'+str(i)], self.params['W'+str(i+1)], self.params['b'+str(i+1)])
         #self.params['z'+str(i+1)] = np.dot(self.params['a'+str(i)],self.params['W'+str(i+1)])+ (self.params['b'+str(i+1)]).T
         #self.params['a'+str(i+1)] = np.maximum(self.params['z'+str(i+1)],0)
+
+      if self.use_dropout: 
+        out['L'+str(i+1)], dropout_cache['L'+str(i+1)] = dropout_forward(out['L'+str(i+1)], self.dropout_param)
 
     scores = out['L'+str(self.num_layers)]
     #print scores
@@ -396,7 +400,7 @@ class FullyConnectedNet(object):
 
     exp_scores = np.exp(scores- np.max(scores, axis=1, keepdims=True))
     sum_exp_scores = np.sum(exp_scores,axis = 1)
-    loss_m = -y_matrix*np.log(exp_scores/(sum_exp_scores[:,None]))
+    loss_m = -y_matrix*np.log(exp_scores/(sum_exp_scores[:,None]+1e-5))
 
     W_total = 0;
     for i in range(self.num_layers):
@@ -410,6 +414,10 @@ class FullyConnectedNet(object):
     
     for i in range(self.num_layers):
       cur_layer = self.num_layers -i
+
+      if self.use_dropout:
+        grads_X = dropout_backward(grads_X, dropout_cache['L'+str(cur_layer)])
+
       if self.use_batchnorm:
         if cur_layer == self.num_layers:
           grads_X, grads['W'+str(cur_layer)], grads['b'+str(cur_layer)] = \
@@ -417,11 +425,10 @@ class FullyConnectedNet(object):
         else:
           grads_X, grads['W'+str(cur_layer)], grads['b'+str(cur_layer)], grads['gamma'+str(cur_layer)], grads['beta'+str(cur_layer)] = \
           affine_bn_relu_backward(grads_X, cache['L'+str(cur_layer)])
-
       else:
         grads_X, grads['W'+str(cur_layer)], grads['b'+str(cur_layer)] = \
                   affine_relu_backward(grads_X, cache['L'+str(cur_layer)])  
-      
+
       grads['W'+str(cur_layer)] /= N
       grads['W'+str(cur_layer)] += self.reg*self.params['W'+str(cur_layer)]
       grads['b'+str(cur_layer)] /= N
