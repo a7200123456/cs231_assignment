@@ -581,24 +581,18 @@ def max_pool_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
-  # dx
-  h_fill = (dout.shape[2]-1)*stride + 1
-  w_fill = (dout.shape[3]-1)*stride + 1
-  dout_expand = np.zeros((dout.shape[0],dout.shape[1],h_fill, w_fill))
-  index_h = np.arange(0,h_fill,stride)
-  index_w = np.arange(0,w_fill,stride)
-  dout_expand[:,:,index_h.reshape(-1,1), index_w] = dout
-  dout_pad_h = (pool_height-1)
-  dout_pad_w = (pool_width-1)
-  dout_expand_pad= np.pad(dout_expand,((0,0),(0,0),(dout_pad_h,dout_pad_h),(dout_pad_w,dout_pad_w)), 'constant', constant_values = 0)
-
   dx = np.zeros(x.shape)
 
-  for n in range(dx.shape[0]):
-    for c in range(dx.shape[1]):
-        for h in range(dx.shape[2]):
-            for width in range(dx.shape[3]):
-                dx[n,c,h,width] = np.sum(dout_expand_pad[n,c,h:(h+pool_height),width:(width+pool_width)])
+  for n in range(dout.shape[0]):
+    for c in range(dout.shape[1]):
+        for h in range(dout.shape[2]):
+            for width in range(dout.shape[3]):
+                h_start = stride*h
+                w_start = stride*width
+                maxindex = np.argmax(x[n,c,h_start:(h_start+pool_height),w_start:(w_start+pool_width)])
+                h_x = stride*h + int(maxindex/stride)
+                w_x = stride*width + (maxindex%stride)
+                dx[n,c,h_x,w_x] = dout[n,c,h,width]
   
   pass
   #print dx

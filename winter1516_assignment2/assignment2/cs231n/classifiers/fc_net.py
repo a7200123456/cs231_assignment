@@ -394,6 +394,8 @@ class FullyConnectedNet(object):
     ############################################################################
     N = scores.shape[0]
     num_classes = scores.shape[1]
+    
+    # softmax loss
     y_matrix = np.zeros(scores.shape)
     for n in range(N):
       y_matrix[n,y[n]] = 1
@@ -407,11 +409,10 @@ class FullyConnectedNet(object):
         W_total += np.sum(self.params['W'+str(i+1)]**2)
     
     loss_s = np.sum(loss_m)/N + 0.5*self.reg*W_total
-
     loss = loss_s
-
     grads_X = (exp_scores/(sum_exp_scores[:,None])) - y_matrix
     
+    # backprop 
     for i in range(self.num_layers):
       cur_layer = self.num_layers -i
 

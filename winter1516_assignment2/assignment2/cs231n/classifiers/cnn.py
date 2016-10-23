@@ -47,6 +47,13 @@ class ThreeLayerConvNet(object):
     # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
     # of the output affine layer.                                              #
     ############################################################################
+    conv_pool_output_dim = (input_dim[1]/2)**2*num_filters
+    self.params['W1'] = weight_scale * np.random.randn(num_filters,input_dim[0], filter_size,filter_size)
+    self.params['W2'] = weight_scale * np.random.randn(conv_pool_output_dim, hidden_dim)
+    self.params['W3'] = weight_scale * np.random.randn(hidden_dim, num_classes) 
+    self.params['b1'] = np.zeros(num_filters)
+    self.params['b2'] = np.zeros(hidden_dim)
+    self.params['b3'] = np.zeros(num_classes)
     pass
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -79,6 +86,14 @@ class ThreeLayerConvNet(object):
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
+    out = {}
+    cache = {}
+
+    out['L1'], cache['L1'] = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
+    out['L2'], cache['L2'] = affine_relu_forward(out['L1'], W2, b2)
+    out['L3'], cache['L3'] = affine_forward(out['L2'], W3, b3)
+
+    scores = out['L3']
     pass
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -94,11 +109,23 @@ class ThreeLayerConvNet(object):
     # data loss using softmax, and make sure that grads[k] holds the gradients #
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
+    N = scores.shape[0]
+    num_classes = scores.shape[1]
+
+    loss, dx = softmax_loss(out['L3'], y)
+    dx, grads['W3'], grads['b3'] = affine_backward(dx, cache['L3'])
+    dx, grads['W2'], grads['b2'] = affine_relu_backward(dx, cache['L2'])
+    dx, grads['W1'], grads['b1'] = conv_relu_pool_backward(dx, cache['L1'])
+    
+    for l in range(3):
+        #grads['W'+str(l+1)] /= N
+        grads['W'+str(l+1)] += self.reg*self.params['W'+str(l+1)]
+        #grads['b'+str(l+1)] /= N  
+
     pass
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
-    
     return loss, grads
   
   
