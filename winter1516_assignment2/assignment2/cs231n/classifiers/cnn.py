@@ -249,6 +249,8 @@ class NaiveConvNet(object):
     dx, grads['W4'], grads['b4'] = affine_backward(dx, cache['L4'])
     dx, grads['W3'], grads['b3'] = affine_relu_backward(dx, cache['L3'])
     dx, grads['W2'], grads['b2'] = conv_relu_pool_backward(dx, cache['L2'])
+    for i in range(out['L1'].shape[0]):
+        dx[i,sort_index[0:8]] = 0;
     dx, grads['W1'], grads['b1'] = conv_relu_backward(dx, cache['L1'])
     
     for l in range(4):
